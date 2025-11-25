@@ -1,87 +1,93 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+from scipy.optimize import fsolve
 
 # ---------------------------------------------------------
-#   MODELO MATEMÁTICO
+#   ECUACIÓN IMPLÍCITA DEL MODELO
+#   t^2 p(t) + t e^p(t) = C
 # ---------------------------------------------------------
 
-def carga_p(t, c1, c2):
-    return (c1 / t**2) - c2 * t
+def resolver_p(t, C):
+    """
+    Resuelve p(t) numéricamente de la ecuación implícita:
+        t^2 * p + t * e^p = C
+    usando fsolve con estimación inicial adaptativa.
+    """
+    # Estimación inicial razonable
+    p0 = -0.1 if t > 2 else 0.5
+    eq = lambda p: t**2 * p + t * np.exp(p) - C
+    return fsolve(eq, p0)[0]
 
-def derivada_p(t, c1, c2):
-    return (-2 * c1) / t**3 - c2
 
+def derivada_p(t, p):
+    """
+    p'(t) = -(2tp + e^p) / (t^2 + t e^p)
+    """
+    return -(2 * t * p + np.exp(p)) / (t**2 + t * np.exp(p))
 
 # ---------------------------------------------------------
 #   INTERFAZ
 # ---------------------------------------------------------
 
-st.title("Modelo de Carga de un Servidor Web")
+st.title("Modelo de Ecuación Implícita del Servidor Web")
 
 st.sidebar.header("Controles del Modelo Matemático")
 
-# Sliders con nombres formales
-c1 = st.sidebar.slider(
-    "Constante de crecimiento (c1)",
-    0.1, 10.0, 2.1487, 0.1
-)
-
-c2 = st.sidebar.slider(
-    "Constante de pérdida temporal (c2)",
-    0.1, 5.0, 0.5, 0.1
+# Constante C de la ecuación implícita
+C = st.sidebar.slider(
+    "Constante C de la ecuación t² p + t e^p = C",
+    0.5, 5.0, 2.1487, 0.0001
 )
 
 t_max = st.sidebar.slider(
     "Tiempo máximo de simulación (t)",
-    5, 100, 25
+    1, 50, 10
 )
 
 resolucion = st.sidebar.slider(
     "Resolución de muestreo (n puntos)",
-    100, 2000, 600, 100
+    50, 2000, 400, 50
 )
 
 # Dominio del tiempo
 t_values = np.linspace(1, t_max, resolucion)
 
-# Cálculos
-p_vals = carga_p(t_values, c1, c2)
-dp_vals = derivada_p(t_values, c1, c2)
+# Resolver p(t) para cada t
+p_vals = np.array([resolver_p(t, C) for t in t_values])
+
+# Calcular derivada p'(t)
+dp_vals = np.array([derivada_p(t, p_vals[i]) for i, t in enumerate(t_values)])
 
 # DataFrame para gráficas
 df_graph = pd.DataFrame({
     "t": t_values,
-    "Carga del servidor p(t)": p_vals,
-    "Derivada de la carga p'(t)": dp_vals
+    "Carga p(t)": p_vals,
+    "Derivada p'(t)": dp_vals
 }).set_index("t")
 
+# ---------------------------------------------------------
+#   GRÁFICAS
+# ---------------------------------------------------------
+st.subheader("Evolución de p(t)")
+st.line_chart(df_graph["Carga p(t)"])
+
+st.subheader("Evolución de la derivada p'(t)")
+st.line_chart(df_graph["Derivada p'(t)"])
 
 # ---------------------------------------------------------
-#   GRÁFICA p(t)
+#   TABLA
 # ---------------------------------------------------------
-st.subheader("Evolución de la Carga del Servidor (p(t))")
-st.line_chart(df_graph["Carga del servidor p(t)"])
+st.subheader("Tabla de Valores (cada 0.5 unidades)")
 
-
-# ---------------------------------------------------------
-#   GRÁFICA p'(t)
-# ---------------------------------------------------------
-st.subheader("Tasa de Cambio de la Carga (p'(t))")
-st.line_chart(df_graph["Derivada de la carga p'(t)"])
-
-
-# ---------------------------------------------------------
-#   TABLA DE VALORES
-# ---------------------------------------------------------
-st.subheader("Tabla de Valores de p(t) y p'(t)")
-
-t_table = np.arange(1, min(t_max, 50) + 1, 2)
+t_table = np.arange(1.0, min(t_max, 50) + 0.1, 0.5)
+p_table = [resolver_p(t, C) for t in t_table]
+dp_table = [derivada_p(t, p_table[i]) for i, t in enumerate(t_table)]
 
 df_table = pd.DataFrame({
-    "Tiempo (t)": t_table,
-    "Carga p(t)": np.round(carga_p(t_table, c1, c2), 4),
-    "Derivada p'(t)": np.round(derivada_p(t_table, c1, c2), 6)
+    "t": np.round(t_table, 3),
+    "p(t)": np.round(p_table, 6),
+    "p'(t)": np.round(dp_table, 6)
 })
 
 st.dataframe(df_table)
