@@ -2,10 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------
-#   RESOLVER p(t) SIN SCIPY (Método de Newton)
-# ---------------------------------------------------------
-
 def resolver_p(t, C, max_iter=50, tol=1e-10):
     """
     Resuelve la ecuación implícita:
